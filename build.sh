@@ -177,6 +177,7 @@ post_build() {
 		echo "- Creating AnyKernel3"
 		gcc -CC utsrelease.c -o getutsrel && UTSRELEASE=$(./getutsrel)
 		cp $IMAGE $AK3
+		cd $AK3
 		zip -r9 ../`echo $ZIP`.zip *
 		# CI will clean itself post-build, so we don't need to clean
 		# Also avoid small AnyKernel3 zip issue!
