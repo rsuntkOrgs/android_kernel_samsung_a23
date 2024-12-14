@@ -160,12 +160,19 @@ pr_post_build() {
 }
 
 post_build() {
+	DATE=$(date +'%Y%m%d%H%M%S')
+	if [ -d $(pwd)/.git ]; then
+		GITSHA=$(git rev-parse --short HEAD)
+	else
+		GITSHA="localbuild"
+	fi
 	AK3="$(pwd)/AnyKernel3"
+	ZIP="AnyKernel3-$DEVICE_$GITSHA-$DATE"
 	## qca_cld3_wlan.ko strip code start
 	echo "- Stripping qca_cld3_wlan.ko"
-	llvm-strip $(pwd)/drivers/staging/qcacld-3.0/qca_cld3_wlan.ko --strip-unneeded
+	llvm-strip $(pwd)/out/drivers/staging/qcacld-3.0/qca_cld3_wlan.ko --strip-unneeded
 	## qca_cld3_wlan.ko strip code end
-	cp $(pwd)/drivers/staging/qcacld-3.0/qca_cld3_wlan.ko $AK3/modules/vendor/lib/modules
+	cp $(pwd)/out/drivers/staging/qcacld-3.0/qca_cld3_wlan.ko $AK3/modules/vendor/lib/modules
 	if [ -d $AK3 ]; then
 		echo "- Creating AnyKernel3"
 		gcc -CC utsrelease.c -o getutsrel && UTSRELEASE=$(./getutsrel)

@@ -49,6 +49,7 @@ jobs:
         export KBUILD_BUILD_USER="${{ github.event.inputs.KBUILD_USER }}"
         export BUILD_START=$(date)
         export IS_CI=true
+        export DEVICE=A235F
         
         if [[ "${{ github.event.inputs.SETUP_KSU }}" = "true" ]]; then 
           export KERNELSU=true
