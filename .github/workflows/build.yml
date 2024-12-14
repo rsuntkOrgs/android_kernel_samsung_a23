@@ -9,10 +9,14 @@ on:
       SETUP_KSU:
         description: KernelSU support (optional)
         type: boolean
+      UPLOAD_TO_TG:
+        description: Upload to Telegram
+        type: boolean
         
 jobs:
   build:
     runs-on: ubuntu-latest
+    environment: uploadTelegram
     steps:
     - uses: actions/checkout@v4
       with:
@@ -85,3 +89,16 @@ jobs:
         name: AnyKernel3-${{ steps.buildKernel.outputs.buildDetails }}
         path: kernel_root/AnyKernel3/*
         compression-level: 9
+        
+    - name: Upload to Telegram
+      if: github.event.inputs.UPLOAD_TO_TG == 'true'
+      env:
+        CHAT_ID: ${{ secrets.CHAT_ID }}
+        BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        TITLE: "Galaxy A23 Kernel"
+      run: |
+        if [ ! -z "${{ secrets.BOT_TOKEN }}" ]; then
+          ZIP=$(find `pwd` -name "*.zip")
+          bash $(pwd)/scripts/rsuntkbot.sh $ZIP "`cat buildDetails.txt`"
+        fi
+      working-directory: kernel_root
