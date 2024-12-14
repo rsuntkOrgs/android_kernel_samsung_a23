@@ -53,13 +53,28 @@ jobs:
         export KBUILD_BUILD_USER="${{ github.event.inputs.KBUILD_USER }}"
         export BUILD_START=$(date)
         export IS_CI=true
+        export DEFCONFIG="rsuntk_defconfig"
         export DEVICE=A235F
         
         if [[ "${{ github.event.inputs.SETUP_KSU }}" = "true" ]]; then 
           export KERNELSU=true
         fi
         
-        bash $(pwd)/build.sh kernel --jobs $(nproc --all) rsuntk_defconfig
+        bash $(pwd)/build.sh kernel --jobs $(nproc --all) `echo $DEFCONFIG`
+        
+        if [[ ${{ github.event.inputs.KSU }} = "true" ]]; then
+        	KSU_REV_COUNT=$(cd KernelSU && git rev-list --count HEAD)
+        	KSU_VERSION=$(expr 10200 + $KSU_REV_COUNT)
+        fi
+        echo "- KernelSU version: $KSU_VERSION"
+        
+        ## CREATE buildDetails.txt
+        printf "Localversion: `./getutsrel`
+        Clang version: `clang -v 2>&1 | grep ' version ' | sed 's/[[:space:]]*$//'`
+        Defconfig: `echo $DEFCONFIG`
+        KernelSU: `echo $KSU_VERSION`
+        Build start: `echo $BUILD_START`
+        " >> buildDetails.txt
         
         echo ""
         echo "===================================================="
