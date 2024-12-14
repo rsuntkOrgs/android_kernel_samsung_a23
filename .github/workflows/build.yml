@@ -23,7 +23,7 @@ jobs:
     - name: Prepare dependencies
       run: |
         sudo apt update -y
-        sudo apt install bc cpio flex bison aptitude git python-is-python3 libc6 libc6-dev libncurses5 libncurses5-dev tar perl curl lz4 -y
+        sudo apt install bc cpio flex bison aptitude git python-is-python3 libc6 libc6-dev tar perl curl lz4 -y
         sudo aptitude install libssl-dev -y
         
     - name: Fetch toolchains
