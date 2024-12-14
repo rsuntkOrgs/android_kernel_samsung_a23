@@ -19,6 +19,9 @@
 #include "wlan_policy_mgr_i.h"
 #include "cfg_ucfg_api.h"
 #include "wlan_policy_mgr_api.h"
+#if !defined(CONFIG_LITHIUM) && defined(SEC_CONFIG_PSM_SYSFS)
+extern int wlan_hdd_sec_get_psm(void);
+#endif /* !CONFIG_LITHIUM && SEC_CONFIG_PSM_SYSFS */
 
 static QDF_STATUS policy_mgr_init_cfg(struct wlan_objmgr_psoc *psoc)
 {
@@ -37,7 +40,6 @@ static QDF_STATUS policy_mgr_init_cfg(struct wlan_objmgr_psoc *psoc)
 	cfg->max_conc_cxns = cfg_get(psoc, CFG_MAX_CONC_CXNS);
 	cfg->conc_rule1 = cfg_get(psoc, CFG_ENABLE_CONC_RULE1);
 	cfg->conc_rule2 = cfg_get(psoc, CFG_ENABLE_CONC_RULE2);
-	cfg->pcl_band_priority = cfg_get(psoc, CFG_PCL_BAND_PRIORITY);
 	cfg->dbs_selection_plcy = cfg_get(psoc, CFG_DBS_SELECTION_PLCY);
 	cfg->vdev_priority_list = cfg_get(psoc, CFG_VDEV_CUSTOM_PRIORITY_LIST);
 	cfg->chnl_select_plcy = cfg_get(psoc, CFG_CHNL_SELECT_LOGIC_CONC);
@@ -66,9 +68,16 @@ static QDF_STATUS policy_mgr_init_cfg(struct wlan_objmgr_psoc *psoc)
 		cfg_get(psoc, CFG_ENABLE_SAP_MANDATORY_CHAN_LIST);
 	cfg->mark_indoor_chnl_disable =
 		cfg_get(psoc, CFG_MARK_INDOOR_AS_DISABLE_FEATURE);
-	cfg->go_force_scc = cfg_get(psoc, CFG_P2P_GO_ENABLE_FORCE_SCC);
 	cfg->prefer_5g_scc_to_dbs = cfg_get(psoc, CFG_PREFER_5G_SCC_TO_DBS);
+	cfg->go_force_scc = cfg_get(psoc, CFG_P2P_GO_ENABLE_FORCE_SCC);
 
+//It will be work on WCN39XX only
+#if !defined(CONFIG_LITHIUM) && defined(SEC_CONFIG_PSM_SYSFS)
+	if (wlan_hdd_sec_get_psm()) {
+		cfg->dual_mac_feature = 1;
+		printk("[WIFI] CFG_DUAL_MAC_FEATURE_DISABLE : sec_control_psm = %u", cfg->dual_mac_feature);
+	}
+#endif /* !CONFIG_LITHIUM && SEC_CONFIG_PSM_SYSFS */
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -227,10 +236,10 @@ ucfg_policy_mgr_get_sta_sap_scc_lte_coex_chnl(struct wlan_objmgr_psoc *psoc,
 
 QDF_STATUS
 ucfg_policy_mgr_init_chan_avoidance(struct wlan_objmgr_psoc *psoc,
-				    qdf_freq_t *chan_freq_list,
+				    uint16_t *chan_list,
 				    uint16_t chan_cnt)
 {
-	return policy_mgr_init_chan_avoidance(psoc, chan_freq_list, chan_cnt);
+	return policy_mgr_init_chan_avoidance(psoc, chan_list, chan_cnt);
 }
 
 QDF_STATUS ucfg_policy_mgr_get_sap_mandt_chnl(struct wlan_objmgr_psoc *psoc,
