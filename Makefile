@@ -386,7 +386,7 @@ OBJSIZE		= llvm-size
 STRIP		= llvm-strip
 else
 CC		= clang
-LD		= ld.lld
+LD		= $(CROSS_COMPILE)ld
 AR		= $(CROSS_COMPILE)ar
 NM		= $(CROSS_COMPILE)nm
 OBJCOPY		= $(CROSS_COMPILE)objcopy
