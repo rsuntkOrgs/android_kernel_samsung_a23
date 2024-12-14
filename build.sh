@@ -161,11 +161,18 @@ pr_post_build() {
 
 post_build() {
 	AK3="$(pwd)/AnyKernel3"
+	## qca_cld3_wlan.ko strip code start
+	echo "- Stripping qca_cld3_wlan.ko"
+	llvm-strip $(pwd)/drivers/staging/qcacld-3.0/qca_cld3_wlan.ko --strip-unneeded
+	## qca_cld3_wlan.ko strip code end
+	cp $(pwd)/drivers/staging/qcacld-3.0/qca_cld3_wlan.ko $AK3/modules/vendor/lib/modules
 	if [ -d $AK3 ]; then
 		echo "- Creating AnyKernel3"
 		gcc -CC utsrelease.c -o getutsrel && UTSRELEASE=$(./getutsrel)
 		cp $IMAGE $AK3
 		zip -r9 ../`echo $ZIP`.zip *
+		# CI will clean itself post-build, so we don't need to clean
+		# Also avoid small AnyKernel3 zip issue!
 		if [ $IS_CI != "true" ]; then
 			echo "- Host is not Automated CI, cleaning dirs"
 			rm $AK3/Image && rm getutsrel && rm utsrelease.c
