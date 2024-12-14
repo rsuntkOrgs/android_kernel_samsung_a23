@@ -9,6 +9,14 @@ export CROSS_COMPILE=/rsuntk/toolchains/aarch64-linux-android/bin/aarch64-linux-
 export PATH=/rsuntk/toolchains/clang-11/bin:$PATH
 fi
 
+setconfig() { # fmt: setconfig enable/disable <CONFIG_NAME>
+	if [ -d $(pwd)/scripts ]; then
+		./scripts/config --file ./out/.config --`echo $1` CONFIG_`echo $2`
+	else
+		pr_err "Folder scripts not found!"
+	fi
+}
+
 if [[ $KERNELSU = "true" ]]; then
     curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s main
 else
@@ -191,6 +199,9 @@ post_build() {
 # build target
 if [ "$BUILD" = "kernel" ]; then
 	make -j`echo $ALLOC_JOB` -C $(pwd) O=$(pwd)/out `echo $DEFAULT_ARGS` `echo $BUILD_DEFCONFIG`
+	if [ "$KERNELSU" = "true" ]; then		
+    		setconfig enable KSU
+	fi
 	make -j`echo $ALLOC_JOB` -C $(pwd) O=$(pwd)/out `echo $DEFAULT_ARGS`
 	if [ -e $IMAGE ]; then
 		pr_post_build "completed"
