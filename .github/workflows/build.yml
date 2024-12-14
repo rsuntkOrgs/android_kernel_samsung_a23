@@ -23,14 +23,14 @@ jobs:
     - name: Prepare dependencies
       run: |
         sudo apt update -y
-        sudo apt install bc cpio flex bison aptitude git python-is-python3 libc6 libtinfo5 libc6-dev tar perl curl lz4 -y
+        sudo apt install bc cpio flex bison aptitude git python-is-python3 libc6 libc6-dev tar perl curl lz4 -y
         sudo aptitude install libssl-dev -y
         
     - name: Fetch toolchains
       run: |
         mkdir toolchains
         cd toolchains
-        git clone https://github.com/rsuntk/qcom-llvm.git --depth=1 qcom-llvm
+        git clone --depth=1 https://gitlab.com/Rissu-Projekt/toolchains/clang-toolchains -b clang-r383902 clang-11
         git clone https://gitlab.com/Rissu-Projekt/toolchains/aarch64-linux-android.git --depth=1 google
       working-directory: kernel_root
 
@@ -42,7 +42,7 @@ jobs:
     - name: Build kernel
       id: buildKernel
       run: |
-        export PATH=$(pwd)/toolchains/qcom-llvm/bin:$PATH
+        export PATH=$(pwd)/toolchains/clang-11/bin:$PATH
         export CROSS_COMPILE=$(pwd)/toolchains/google/bin/aarch64-linux-android-
         export CLANG_TRIPLE=aarch64-linux-gnu-
         export KBUILD_BUILD_HOST="rsuntk_orgs"
