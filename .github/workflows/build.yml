@@ -39,6 +39,10 @@ jobs:
         sudo rm /etc/localtime
         sudo ln -s /usr/share/zoneinfo/Asia/Jakarta /etc/localtime
           
+    - name: Libncurses workaround
+      run: |
+        sudo ln -s /usr/lib/libncursesw.so.6 /usr/lib/libtinfo.so.5
+        
     - name: Build kernel
       id: buildKernel
       run: |
