@@ -176,7 +176,8 @@ post_build() {
 	fi
 	AK3="$(pwd)/AnyKernel3"
 	ZIP="AnyKernel3-`echo $DEVICE`_$GITSHA-$DATE"
-	if [[ $QCA_IS_MODULE = "true" ]]; then
+	if [[ "$QCA_IS_MODULE" = "true" ]]; then
+		sed -i "s/do\.modules=.*/do.modules=1/" "$(pwd)/AnyKernel3/anykernel.sh"
 		## qca_cld3_wlan.ko strip code start
 		echo "- Stripping wlan.ko"
 		llvm-strip $(pwd)/out/drivers/staging/qcacld-3.0/wlan.ko --strip-unneeded
@@ -190,7 +191,9 @@ post_build() {
 	fi
 	if [ -d $AK3 ]; then
 		echo "- Creating AnyKernel3"
-		gcc -CC utsrelease.c -o getutsrel && UTSRELEASE=$(./getutsrel)
+		gcc -CC utsrelease.c -o getutsrel
+		UTSRELEASE=$(./getutsrel)
+		sed -i "s/kernel\.string=.*/kernel.string=$UTSRELEASE/" "$(pwd)/AnyKernel3/anykernel.sh"
 		cp $IMAGE $AK3
 		cd $AK3
 		zip -r9 ../`echo $ZIP`.zip *
