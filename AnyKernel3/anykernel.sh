@@ -15,7 +15,6 @@ supported.patchlevels=
 supported.vendorpatchlevels=
 '; } # end properties
 
-
 # shell variables
 block=/dev/block/by-name/boot;
 is_slot_device=0;

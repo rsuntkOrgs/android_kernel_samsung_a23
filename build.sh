@@ -185,6 +185,7 @@ post_build() {
 		cp $(pwd)/out/drivers/staging/qcacld-3.0/wlan.ko $AK3/modules/vendor/lib/modules/qca_cld3_wlan.ko
 		## create copy of wlan.ko code end
 		## qca_cld3_wlan.ko strip code end
+		rm $AK3/modules/vendor/lib/modules/stub
 		## copy .ko to anykernel3 code start
 		cp $(pwd)/out/drivers/staging/qcacld-3.0/wlan.ko $AK3/modules/vendor/lib/modules
 		## copy .ko to anykernel3 code end

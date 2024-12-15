@@ -55,6 +55,7 @@ jobs:
         export IS_CI=true
         export DEFCONFIG="rsuntk_defconfig"
         export DEVICE=A235F
+        export QCA_IS_MODULE=true
         
         if [[ "${{ github.event.inputs.SETUP_KSU }}" = "true" ]]; then 
           export KERNELSU=true
