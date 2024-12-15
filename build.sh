@@ -175,12 +175,17 @@ post_build() {
 		GITSHA="localbuild"
 	fi
 	AK3="$(pwd)/AnyKernel3"
-	ZIP="AnyKernel3-$DEVICE_$GITSHA-$DATE"
+	ZIP="AnyKernel3-`echo $DEVICE`_$GITSHA-$DATE"
 	## qca_cld3_wlan.ko strip code start
-	echo "- Stripping qca_cld3_wlan.ko"
-	llvm-strip $(pwd)/out/drivers/staging/qcacld-3.0/qca_cld3_wlan.ko --strip-unneeded
+	echo "- Stripping wlan.ko"
+	llvm-strip $(pwd)/out/drivers/staging/qcacld-3.0/wlan.ko --strip-unneeded
+	## create copy of wlan.ko code start
+	cp $(pwd)/out/drivers/staging/qcacld-3.0/wlan.ko $AK3/modules/vendor/lib/modules/qca_cld3_wlan.ko
+	## create copy of wlan.ko code end
 	## qca_cld3_wlan.ko strip code end
-	cp $(pwd)/out/drivers/staging/qcacld-3.0/qca_cld3_wlan.ko $AK3/modules/vendor/lib/modules
+	## copy .ko to anykernel3 code start
+	cp $(pwd)/out/drivers/staging/qcacld-3.0/wlan.ko $AK3/modules/vendor/lib/modules
+	## copy .ko to anykernel3 code end
 	if [ -d $AK3 ]; then
 		echo "- Creating AnyKernel3"
 		gcc -CC utsrelease.c -o getutsrel && UTSRELEASE=$(./getutsrel)
