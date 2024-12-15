@@ -176,16 +176,18 @@ post_build() {
 	fi
 	AK3="$(pwd)/AnyKernel3"
 	ZIP="AnyKernel3-`echo $DEVICE`_$GITSHA-$DATE"
-	## qca_cld3_wlan.ko strip code start
-	echo "- Stripping wlan.ko"
-	llvm-strip $(pwd)/out/drivers/staging/qcacld-3.0/wlan.ko --strip-unneeded
-	## create copy of wlan.ko code start
-	cp $(pwd)/out/drivers/staging/qcacld-3.0/wlan.ko $AK3/modules/vendor/lib/modules/qca_cld3_wlan.ko
-	## create copy of wlan.ko code end
-	## qca_cld3_wlan.ko strip code end
-	## copy .ko to anykernel3 code start
-	cp $(pwd)/out/drivers/staging/qcacld-3.0/wlan.ko $AK3/modules/vendor/lib/modules
-	## copy .ko to anykernel3 code end
+	if [[ $QCA_IS_MODULE = "true" ]]; then
+		## qca_cld3_wlan.ko strip code start
+		echo "- Stripping wlan.ko"
+		llvm-strip $(pwd)/out/drivers/staging/qcacld-3.0/wlan.ko --strip-unneeded
+		## create copy of wlan.ko code start
+		cp $(pwd)/out/drivers/staging/qcacld-3.0/wlan.ko $AK3/modules/vendor/lib/modules/qca_cld3_wlan.ko
+		## create copy of wlan.ko code end
+		## qca_cld3_wlan.ko strip code end
+		## copy .ko to anykernel3 code start
+		cp $(pwd)/out/drivers/staging/qcacld-3.0/wlan.ko $AK3/modules/vendor/lib/modules
+		## copy .ko to anykernel3 code end
+	fi
 	if [ -d $AK3 ]; then
 		echo "- Creating AnyKernel3"
 		gcc -CC utsrelease.c -o getutsrel && UTSRELEASE=$(./getutsrel)
