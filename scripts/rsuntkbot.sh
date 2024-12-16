@@ -3,7 +3,7 @@ msg="*$TITLE*
 \`\`\`
 $2
 \`\`\`
-*Untested, backup working boot before flash\\.*
+*Note: Always backup working boot before flash\\.*
 "
 file="$1"
 curl -s -F document=@$file "https://api.telegram.org/bot$BOT_TOKEN/sendDocument" \

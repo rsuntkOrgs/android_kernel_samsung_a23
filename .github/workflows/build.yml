@@ -2,6 +2,15 @@ name: Build Kernel
 on:
   workflow_dispatch:
     inputs:
+      LTO:
+        description: 'Link Time Optimisation'
+        required: true
+        default: 'none'
+        type: choice
+        options:
+          - none
+          - thin
+          - full
       KBUILD_USER:
         description: Kbuild user
         default: 'rsuntk'
@@ -68,7 +77,10 @@ jobs:
         export IS_CI=true
         export DEFCONFIG="rsuntk_defconfig"
         export DEVICE=A235F
+        export LTO="${{ github.event.inputs.LTO }}"
         export QCA_IS_MODULE=true
+        # stub, we'll implement this later
+        export SELINUX_STATE="Enforcing"
         
         if [[ "${{ github.event.inputs.SETUP_KSU }}" = "true" ]]; then 
           export KERNELSU=true
@@ -85,9 +97,11 @@ jobs:
         ## CREATE buildDetails.txt
         printf "Localversion: `./getutsrel`
         Clang version: `clang -v 2>&1 | grep ' version ' | sed 's/[[:space:]]*$//'`
+        Build: `date +'%d %B %Y @ %m:%M'`
         Defconfig: `echo $DEFCONFIG`
         KernelSU: `echo $KSU_VERSION`
-        Build start: `echo $BUILD_START`
+        LTO: `echo $LTO`
+        SELinux: `echo $SELINUX_STATE`
         " >> buildDetails.txt
         
         echo ""
