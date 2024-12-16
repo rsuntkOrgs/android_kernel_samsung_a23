@@ -17,12 +17,6 @@ setconfig() { # fmt: setconfig enable/disable <CONFIG_NAME>
 	fi
 }
 
-if [[ $KERNELSU = "true" ]]; then
-    curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s main
-else
-    echo -e "KernelSU is disabled. Add 'KERNELSU=true' or 'export KERNELSU=true' to enable"
-fi
-
 # generate simple c file
 if [ ! -e utsrelease.c ]; then
 echo "/* Generated file by `basename $0` */
@@ -46,11 +40,21 @@ usage() {
 	printf "NOTE: Run: \texport CROSS_COMPILE=\"<PATH_TO_ANDROID_CC>\"\n"
 	printf "\t\texport PATH=\"<PATH_TO_LLVM>\"\n"
 	printf "before running this script!\n"
-	exit;
+	echo ""
+	printf "Misc:\n"
+	printf "\tPOST_BUILD_CLEAN: Clean post build (host only)\n"
+	printf "\tLTO: Use Link-time Optimization; options: (none, thin, full)\n"
+	exit
 }
 
 if [ $# != 4 ]; then
 	usage;
+fi
+
+if [[ $KERNELSU = "true" ]]; then
+    curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s main
+else
+    echo -e "KernelSU is disabled. Add 'KERNELSU=true' or 'export KERNELSU=true' to enable"
 fi
 
 pr_invalid() {
@@ -105,6 +109,7 @@ CONFIG_SECTION_MISMATCH_WARN_ONLY=y
 ARCH=arm64
 "
 IMAGE="$(pwd)/out/arch/arm64/boot/Image"
+AK3="$(pwd)/AnyKernel3"
 
 if [ "$LLVM" = "1" ]; then
 	LLVM_="true"
@@ -138,7 +143,7 @@ pr_sum() {
 	echo ""
 	echo -e "Host Arch: `uname -m`"
 	echo -e "Host Kernel: `uname -r`"
-	echo -e "Host gnumake: `make -v | grep -e "GNU Make"`"
+	echo -e "Host gnumake version: `make -v | grep -e "GNU Make"`"
 	echo ""
 	echo -e "Linux version: `make kernelversion`"
 	echo -e "Kernel builder user: $KBUILD_BUILD_USER"
@@ -148,10 +153,12 @@ pr_sum() {
 	echo -e "Arch: $ARCH"
 	echo -e "Defconfig: $BUILD_DEFCONFIG"
 	echo -e "Allocated core: $ALLOC_JOB"
-	echo -e ""
+	echo ""
 	echo -e "LLVM: $LLVM_"
 	echo -e "LLVM_IAS: $LLVM_IAS_"
-	echo -e ""
+	echo ""
+	echo -e "LTO: $LTO"
+	echo ""
 }
 
 # call summary
@@ -167,6 +174,18 @@ pr_post_build() {
 	fi
 }
 
+post_build_clean() {
+	rm $AK3/Image
+	rm getutsrel
+	rm utsrelease.c
+	# clean out folder
+	rm -rf out
+	# revert back to do.modules=0
+	sed -i "s/do\.modules=.*/do.modules=0/" "$(pwd)/AnyKernel3/anykernel.sh"
+	rm -rf $AK3/modules/vendor/lib/modules/*.ko
+	echo "stub" > $AK3/modules/vendor/lib/modules/stub
+}	
+
 post_build() {
 	DATE=$(date +'%Y%m%d%H%M%S')
 	if [ -d $(pwd)/.git ]; then
@@ -174,7 +193,6 @@ post_build() {
 	else
 		GITSHA="localbuild"
 	fi
-	AK3="$(pwd)/AnyKernel3"
 	ZIP="AnyKernel3-`echo $DEVICE`_$GITSHA-$DATE"
 	if [[ "$QCA_IS_MODULE" = "true" ]]; then
 		sed -i "s/do\.modules=.*/do.modules=1/" "$(pwd)/AnyKernel3/anykernel.sh"
@@ -201,8 +219,10 @@ post_build() {
 		# CI will clean itself post-build, so we don't need to clean
 		# Also avoid small AnyKernel3 zip issue!
 		if [ $IS_CI != "true" ]; then
-			echo "- Host is not Automated CI, cleaning dirs"
-			rm $AK3/Image && rm getutsrel && rm utsrelease.c
+			if [[ "$POST_BUILD_CLEAN" = "true" ]]; then
+				echo "- Host is not Automated CI, cleaning dirs"
+				post_build_clean;
+			fi
 		fi
 	fi
 }
@@ -212,6 +232,31 @@ if [ "$BUILD" = "kernel" ]; then
 	make -j`echo $ALLOC_JOB` -C $(pwd) O=$(pwd)/out `echo $DEFAULT_ARGS` `echo $BUILD_DEFCONFIG`
 	if [ "$KERNELSU" = "true" ]; then		
     		setconfig enable KSU
+	fi
+	if [[ "$LTO" = "thin" ]]; then
+		echo "LTO: thin"
+		setconfig disable LTO_NONE
+		setconfig enable LTO
+		setconfig enable THINLTO
+		setconfig enable LTO_CLANG
+		setconfig enable ARCH_SUPPORTS_LTO_CLANG
+		setconfig enable ARCH_SUPPORTS_THINLTO
+	elif [[ "$LTO" = "full" ]]; then
+		echo "LTO: full"
+		setconfig disable LTO_NONE
+		setconfig enable LTO
+		setconfig disable THINLTO
+		setconfig enable LTO_CLANG
+		setconfig enable ARCH_SUPPORTS_LTO_CLANG
+		setconfig enable ARCH_SUPPORTS_THINLTO
+	else
+		echo "LTO: none"
+		setconfig enable LTO_NONE
+		setconfig disable LTO
+		setconfig disable THINLTO
+		setconfig disable LTO_CLANG
+		setconfig enable ARCH_SUPPORTS_LTO_CLANG
+		setconfig enable ARCH_SUPPORTS_THINLTO
 	fi
 	make -j`echo $ALLOC_JOB` -C $(pwd) O=$(pwd)/out `echo $DEFAULT_ARGS`
 	if [ -e $IMAGE ]; then

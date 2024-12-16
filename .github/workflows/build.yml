@@ -21,9 +21,6 @@ on:
       UPLOAD_TO_TG:
         description: Upload to Telegram
         type: boolean
-      CLANG_SIXTEEN:
-        description: Compile with clang 16
-        type: boolean
         
 jobs:
   build:
@@ -46,13 +43,7 @@ jobs:
       run: |
         mkdir toolchains
         cd toolchains
-        if [[ "${{ github.event.inputs.CLANG_SIXTEEN }}" = "true" ]]; then
-          mkdir clang-16 && cd clang-16
-          wget -q -O clang16.tar.gz https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android14-release/clang-r475365b.tar.gz
-          tar -xf clang16.tar.gz && rm clang16.tar.gz && cd ..
-        else
-          git clone --depth=1 https://gitlab.com/Rissu-Projekt/toolchains/clang-toolchains -b clang-r383902 clang-11
-        fi
+        git clone --depth=1 https://gitlab.com/Rissu-Projekt/toolchains/clang-toolchains -b clang-r383902 clang-11
         git clone https://gitlab.com/Rissu-Projekt/toolchains/aarch64-linux-android.git --depth=1 google
       working-directory: kernel_root
 
@@ -64,11 +55,7 @@ jobs:
     - name: Build kernel
       id: buildKernel
       run: |
-        if [[ "${{ github.event.inputs.CLANG_SIXTEEN }}" = "true" ]]; then
-          export PATH=$(pwd)/toolchains/clang-16/bin:$PATH
-        else
-          export PATH=$(pwd)/toolchains/clang-11/bin:$PATH
-        fi
+      	export PATH=$(pwd)/toolchains/clang-11/bin:$PATH
         export CROSS_COMPILE=$(pwd)/toolchains/google/bin/aarch64-linux-android-
         export CLANG_TRIPLE=aarch64-linux-gnu-
         export KBUILD_BUILD_HOST="rsuntk_orgs"
@@ -91,6 +78,8 @@ jobs:
         if [[ "${{ github.event.inputs.SETUP_KSU }}" = "true" ]]; then
         	KSU_REV_COUNT=$(cd KernelSU && git rev-list --count HEAD)
         	KSU_VERSION=$(expr 10200 + $KSU_REV_COUNT)
+        else
+        	KSU_VERSION="No KernelSU"
         fi
         echo "- KernelSU version: $KSU_VERSION"
         
