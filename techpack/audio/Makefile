@@ -19,7 +19,7 @@ include $(srctree)/techpack/audio/config/sdm660auto.conf
 endif
 
 ifeq ($(CONFIG_ARCH_BENGAL), y)
-$(info [techpack/audio] PROJECT_NAME is $(filter $(PROJECT_NAME))
+$(info [techpack/audio] PROJECT_NAME is $(filter $(PROJECT_NAME)))
 ifeq ($(PROJECT_NAME),$(filter $(PROJECT_NAME),a23))
 include $(srctree)/techpack/audio/config/bengal_a23.conf
 else
