@@ -55,10 +55,10 @@ jobs:
     - name: Build kernel
       id: buildKernel
       run: |
-      	if [[ "${{ github.event.inputs.CLANG_SIXTEEN }}" = "true" ]]; then
-        	export PATH=$(pwd)/toolchains/clang-16/bin:$PATH
+        if [[ "${{ github.event.inputs.CLANG_SIXTEEN }}" = "true" ]]; then
+          export PATH=$(pwd)/toolchains/clang-16/bin:$PATH
         else
-        	export PATH=$(pwd)/toolchains/clang-11/bin:$PATH
+          export PATH=$(pwd)/toolchains/clang-11/bin:$PATH
         fi
         export CROSS_COMPILE=$(pwd)/toolchains/google/bin/aarch64-linux-android-
         export CLANG_TRIPLE=aarch64-linux-gnu-
