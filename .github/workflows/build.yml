@@ -55,7 +55,7 @@ jobs:
     - name: Build kernel
       id: buildKernel
       run: |
-      	export PATH=$(pwd)/toolchains/clang-11/bin:$PATH
+        export PATH=$(pwd)/toolchains/clang-11/bin:$PATH
         export CROSS_COMPILE=$(pwd)/toolchains/google/bin/aarch64-linux-android-
         export CLANG_TRIPLE=aarch64-linux-gnu-
         export KBUILD_BUILD_HOST="rsuntk_orgs"
