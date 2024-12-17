@@ -66,8 +66,6 @@ jobs:
         export DEVICE=A235F
         export LTO="${{ github.event.inputs.LTO }}"
         export QCA_IS_MODULE=true
-        export LLVM=1
-        export LLVM_IAS=1
         # stub, we'll implement this later
         export SELINUX_STATE="Enforcing"
         
