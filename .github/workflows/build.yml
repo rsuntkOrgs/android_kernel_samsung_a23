@@ -65,7 +65,7 @@ jobs:
         export DEFCONFIG="rsuntk_defconfig"
         export DEVICE=A235F
         export LTO="${{ github.event.inputs.LTO }}"
-        export QCA_IS_MODULE=true
+        export QCA_IS_MODULE=false
         # stub, we'll implement this later
         export SELINUX_STATE="Enforcing"
         
