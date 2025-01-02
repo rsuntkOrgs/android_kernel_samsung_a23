@@ -200,6 +200,10 @@ struct scsi_device {
 	unsigned broken_fua:1;		/* Don't set FUA bit */
 	unsigned lun_in_cdb:1;		/* Store LUN bits in CDB[1] */
 	unsigned unmap_limit_for_ws:1;	/* Use the UNMAP limit for WRITE SAME */
+	unsigned use_rpm_auto:1; /* Enable runtime PM auto suspend */
+
+#define SCSI_DEFAULT_AUTOSUSPEND_DELAY  -1
+	int autosuspend_delay;
 	unsigned rpm_autosuspend:1;	/* Enable runtime autosuspend at device
 					 * creation time */
 	/* If non-zero, use timeout (in jiffies) for all commands */
@@ -238,6 +242,8 @@ struct scsi_device {
 	ANDROID_KABI_RESERVE(2);
 	ANDROID_KABI_RESERVE(3);
 	ANDROID_KABI_RESERVE(4);
+	u8 bootlunID;
+	bool support_tw_lu;
 } __attribute__((aligned(sizeof(unsigned long))));
 
 #define	to_scsi_device(d)	\
