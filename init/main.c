@@ -99,8 +99,29 @@
 #include <asm/sections.h>
 #include <asm/cacheflush.h>
 
+#ifdef CONFIG_SECURITY_DEFEX
+#include <linux/defex.h>
+void __init __weak defex_load_rules(void) { }
+#endif
+
+#if IS_ENABLED(CONFIG_SEC_GPIO_DVS)
+#include <linux/secgpio_dvs.h>
+#endif /* CONFIG_SEC_GPIO_DVS */
+
 #define CREATE_TRACE_POINTS
 #include <trace/events/initcall.h>
+
+#if IS_ENABLED(CONFIG_SEC_DEBUG)
+#include <linux/sec_debug.h>
+#include <linux/sec_bootstat.h>
+#endif
+
+#ifdef CONFIG_RKP
+#include <linux/rkp.h>
+#endif
+#ifdef CONFIG_KDP
+#include <linux/kdp.h>
+#endif
 
 static int kernel_init(void *);
 
@@ -195,8 +216,15 @@ static bool __init obsolete_checksetup(char *line)
 				pr_warn("Parameter %s is obsolete, ignored\n",
 					p->str);
 				return true;
-			} else if (p->setup_func(line + n))
-				return true;
+			} else {
+				int ret;
+
+				memblock_memsize_set_name(p->str);
+				ret = p->setup_func(line + n);
+				memblock_memsize_unset_name();
+				if (ret)
+					return true;
+			}
 		}
 		p++;
 	} while (p < __setup_end);
@@ -381,6 +409,9 @@ static void __init setup_command_line(char *command_line)
 	static_command_line = memblock_virt_alloc(strlen(command_line) + 1, 0);
 	strcpy(saved_command_line, boot_command_line);
 	strcpy(static_command_line, command_line);
+#if IS_ENABLED(CONFIG_SEC_DEBUG)
+	sec_debug_get_erased_command_line();
+#endif
 }
 
 /*
@@ -453,8 +484,10 @@ static int __init do_early_param(char *param, char *val,
 		    (strcmp(param, "console") == 0 &&
 		     strcmp(p->str, "earlycon") == 0)
 		) {
+			memblock_memsize_set_name(p->str);
 			if (p->setup_func(val) != 0)
 				pr_warn("Malformed early option '%s'\n", param);
+			memblock_memsize_unset_name();
 		}
 	}
 	/* We accept everything at this stage. */
@@ -544,6 +577,8 @@ static void __init mm_init(void)
 	page_ext_init_flatmem();
 	report_meminit();
 	mem_init();
+	/* page_owner must be initialized after buddy is ready */
+	page_ext_init_flatmem_late();
 	kmem_cache_init();
 	pgtable_init();
 	vmalloc_init();
@@ -586,7 +621,15 @@ asmlinkage __visible void __init start_kernel(void)
 	build_all_zonelists(NULL);
 	page_alloc_init();
 
+#if IS_ENABLED(CONFIG_SEC_DEBUG)
+	pr_notice("Kernel command line: %s\n",
+			!IS_ENABLED(CONFIG_SAMSUNG_PRODUCT_SHIP) ?
+			boot_command_line :
+			sec_debug_get_erased_command_line());
+#else
 	pr_notice("Kernel command line: %s\n", boot_command_line);
+#endif
+
 	/* parameters may set static keys */
 	jump_label_init();
 	parse_early_param();
@@ -607,7 +650,12 @@ asmlinkage __visible void __init start_kernel(void)
 	sort_main_extable();
 	trap_init();
 	mm_init();
-
+#ifdef CONFIG_RKP
+	rkp_init();
+#endif
+#ifdef CONFIG_KDP
+	kdp_enable = 1;
+#endif
 	ftrace_init();
 
 	/* trace_printk can be enabled here */
@@ -737,6 +785,10 @@ asmlinkage __visible void __init start_kernel(void)
 		efi_enter_virtual_mode();
 #endif
 	thread_stack_cache_init();
+#ifdef CONFIG_KDP
+	if (kdp_enable)
+		kdp_init();
+#endif
 	cred_init();
 	fork_init();
 	proc_caches_init();
@@ -852,6 +904,43 @@ static bool __init_or_module initcall_blacklisted(initcall_t fn)
 #endif
 __setup("initcall_blacklist=", initcall_blacklist);
 
+#ifdef CONFIG_SEC_BOOTSTAT
+static bool __init_or_module initcall_sec_debug = true;
+static DEFINE_SPINLOCK(device_init_time_list_lock);
+
+static int __init_or_module do_one_initcall_sec_debug(initcall_t fn)
+{
+	ktime_t calltime, delta, rettime;
+	unsigned long long duration;
+	int ret;
+	struct device_init_time_entry *entry;
+
+	calltime = ktime_get();
+	ret = fn();
+	rettime = ktime_get();
+	delta = ktime_sub(rettime, calltime);
+	duration = (unsigned long long) ktime_to_ns(delta) >> 10;
+	if (duration > DEVICE_INIT_TIME_100MS) {
+		printk(KERN_DEBUG "initcall %pF returned %d after %lld usecs\n",
+				fn, ret, duration);
+		entry = kmalloc(sizeof(*entry), GFP_KERNEL);
+		if (!entry)
+			return -ENOMEM;
+		entry->buf = kasprintf(GFP_KERNEL, "%pf", fn);
+		if (!entry->buf) {
+			kfree(entry);
+			return -ENOMEM;
+		}
+		entry->duration = duration;
+		spin_lock(&device_init_time_list_lock);
+		list_add(&entry->next, &device_init_time_list);
+		spin_unlock(&device_init_time_list_lock);
+	}
+
+	return ret;
+}
+#endif
+
 static __init_or_module void
 trace_initcall_start_cb(void *data, initcall_t fn)
 {
@@ -915,6 +1004,11 @@ int __init_or_module do_one_initcall(initcall_t fn)
 		return -EPERM;
 
 	do_trace_initcall_start(fn);
+#ifdef CONFIG_SEC_BOOTSTAT
+	if (initcall_sec_debug)
+		ret = do_one_initcall_sec_debug(fn);
+	else
+#endif
 	ret = fn();
 	do_trace_initcall_finish(fn, ret);
 
@@ -1094,6 +1188,16 @@ static int __ref kernel_init(void *unused)
 	int ret;
 
 	kernel_init_freeable();
+
+#if IS_ENABLED(CONFIG_SEC_GPIO_DVS)
+	/************************ Caution !!! ****************************/
+	/* This function must be located in appropriate INIT position
+	 * in accordance with the specification of each BB vendor.
+	 */
+	/************************ Caution !!! ****************************/
+	gpio_dvs_check_initgpio();
+#endif /* CONFIG_SEC_GPIO_DVS */
+
 	/* need to finish all async __init code before freeing the memory */
 	async_synchronize_full();
 	ftrace_free_init_mem();
@@ -1114,8 +1218,12 @@ static int __ref kernel_init(void *unused)
 
 	if (ramdisk_execute_command) {
 		ret = run_init_process(ramdisk_execute_command);
-		if (!ret)
+		if (!ret) {
+#ifdef CONFIG_RKP
+			rkp_deferred_init();
+#endif
 			return 0;
+		}
 		pr_err("Failed to execute %s (error %d)\n",
 		       ramdisk_execute_command, ret);
 	}
@@ -1209,4 +1317,8 @@ static noinline void __init kernel_init_freeable(void)
 
 	integrity_load_keys();
 	load_default_modules();
+#ifdef CONFIG_SECURITY_DEFEX
+	defex_load_rules();
+#endif
+
 }
