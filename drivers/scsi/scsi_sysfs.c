@@ -673,8 +673,11 @@ sdev_store_timeout (struct device *dev, struct device_attribute *attr,
 {
 	struct scsi_device *sdev;
 	int timeout;
+	int res;
 	sdev = to_scsi_device(dev);
-	sscanf (buf, "%d\n", &timeout);
+	res = sscanf(buf, "%d\n", &timeout);
+	if (res != 1)
+		return -EINVAL;
 	blk_queue_rq_timeout(sdev->request_queue, timeout * HZ);
 	return count;
 }
@@ -1291,7 +1294,7 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 	device_enable_async_suspend(&sdev->sdev_gendev);
 	scsi_autopm_get_target(starget);
 	pm_runtime_set_active(&sdev->sdev_gendev);
-	if (!sdev->rpm_autosuspend)
+	if (!sdev->use_rpm_auto)
 		pm_runtime_forbid(&sdev->sdev_gendev);
 	pm_runtime_enable(&sdev->sdev_gendev);
 	scsi_autopm_put_target(starget);
