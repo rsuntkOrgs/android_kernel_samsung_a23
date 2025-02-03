@@ -319,8 +319,24 @@ default_path:
 	path_get(canonical_path);
 }
 
+/* @fs.sec -- 63ff82f9216c9b6d003e7d45699d54b833344719 -- */
+static int fuse_dentry_delete(const struct dentry *dentry)
+{
+	struct fuse_inode *fi;
+
+	if (d_really_is_negative(dentry))
+		return 0;
+
+	fi = get_fuse_inode(d_inode(dentry));
+	if (test_bit(FUSE_I_ATTR_FORCE_SYNC, &fi->state))
+		return 1;
+
+	return 0;
+}
+
 const struct dentry_operations fuse_dentry_operations = {
 	.d_revalidate	= fuse_dentry_revalidate,
+	.d_delete	= fuse_dentry_delete,
 	.d_init		= fuse_dentry_init,
 	.d_release	= fuse_dentry_release,
 	.d_canonical_path = fuse_dentry_canonical_path,
@@ -329,6 +345,7 @@ const struct dentry_operations fuse_dentry_operations = {
 const struct dentry_operations fuse_root_dentry_operations = {
 	.d_init		= fuse_dentry_init,
 	.d_release	= fuse_dentry_release,
+	.d_canonical_path = fuse_dentry_canonical_path,
 };
 
 int fuse_valid_type(int m)
@@ -994,7 +1011,7 @@ static int fuse_update_get_attr(struct inode *inode, struct file *file,
 	else
 		sync = time_before64(fi->i_time, get_jiffies_64());
 
-	if (sync) {
+	if (sync || test_bit(FUSE_I_ATTR_FORCE_SYNC, &fi->state)) {
 		forget_all_cached_acls(inode);
 		err = fuse_do_getattr(inode, stat, file);
 	} else if (stat) {
@@ -1174,7 +1191,8 @@ static int fuse_permission(struct inode *inode, int mask)
 	    ((mask & MAY_EXEC) && S_ISREG(inode->i_mode))) {
 		struct fuse_inode *fi = get_fuse_inode(inode);
 
-		if (time_before64(fi->i_time, get_jiffies_64())) {
+		if (time_before64(fi->i_time, get_jiffies_64()) ||
+		    test_bit(FUSE_I_ATTR_FORCE_SYNC, &fi->state)) {
 			refreshed = true;
 
 			err = fuse_perm_getattr(inode, mask);
@@ -1592,7 +1610,7 @@ void fuse_set_nowrite(struct inode *inode)
 	BUG_ON(fi->writectr < 0);
 	fi->writectr += FUSE_NOWRITE;
 	spin_unlock(&fc->lock);
-	wait_event(fi->page_waitq, fi->writectr == FUSE_NOWRITE);
+	fuse_wait_event(fi->page_waitq, fi->writectr == FUSE_NOWRITE);
 }
 
 /*
