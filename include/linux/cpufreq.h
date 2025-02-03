@@ -33,6 +33,7 @@
 #define CPUFREQ_NAME_LEN		16
 /* Print length for names. Extra 1 space for accommodating '\n' in prints */
 #define CPUFREQ_NAME_PLEN		(CPUFREQ_NAME_LEN + 1)
+#define SCHED_CPUFREQ_FPS (1U << 9)
 
 struct cpufreq_governor;
 
@@ -210,6 +211,25 @@ static inline unsigned int cpufreq_quick_get_max(unsigned int cpu)
 	return 0;
 }
 static inline void disable_cpufreq(void) { }
+#endif
+
+#if defined(CONFIG_CPU_FREQ_LIMIT_USERSPACE)
+enum {
+	DVFS_NO_ID			= 0,
+
+	/* need to update now */
+	DVFS_TOUCH_ID			= 1,
+	DVFS_FINGER_ID			= 2,
+	DVFS_MULTI_TOUCH_ID		= 3,
+	DVFS_ARGOS_ID			= 4,
+	DVFS_BOOST_HOST_ID		= 5,
+	DVFS_USER_MIN_ID		= 6,
+	DVFS_USER_MAX_ID		= 7,
+
+	DVFS_MAX_ID
+};
+
+int set_freq_limit(unsigned long id, unsigned int freq);
 #endif
 
 #ifdef CONFIG_CPU_FREQ_STAT
@@ -429,6 +449,7 @@ static inline void cpufreq_resume(void) {}
 /* Policy Notifiers  */
 #define CPUFREQ_ADJUST			(0)
 #define CPUFREQ_NOTIFY			(1)
+#define CPUFREQ_INCOMPATIBLE	(6)
 
 #ifdef CONFIG_CPU_FREQ
 int cpufreq_register_notifier(struct notifier_block *nb, unsigned int list);
@@ -957,4 +978,6 @@ unsigned int cpufreq_generic_get(unsigned int cpu);
 int cpufreq_generic_init(struct cpufreq_policy *policy,
 		struct cpufreq_frequency_table *table,
 		unsigned int transition_latency);
+
+extern unsigned int cpuinfo_max_freq_cached;
 #endif /* _LINUX_CPUFREQ_H */
