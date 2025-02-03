@@ -76,7 +76,8 @@ UTS_TRUNCATE="cut -b -$UTS_LEN"
   CC_VERSION=$($CC -v 2>&1 | grep ' version ' | sed 's/[[:space:]]*$//')
   LD_VERSION=$($LD -v | head -n1 | sed 's/(compatible with [^)]*)//' \
 		      | sed 's/[[:space:]]*$//')
-  printf '#define LINUX_COMPILER "%s"\n' "$CC_VERSION, $LD_VERSION"
+  RSU="rsuntkOrgs (khaje, qcom680) buildStampId: `date +'%s-%d%m%Y'`"
+  printf '#define LINUX_COMPILER "%s"\n' "$CC_VERSION, $LD_VERSION, $RSU"
 ) > .tmpcompile
 
 # Only replace the real compile.h if the new one is different,
