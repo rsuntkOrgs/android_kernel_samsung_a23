@@ -131,8 +131,23 @@ static void mmc_bus_shutdown(struct device *dev)
 {
 	struct mmc_driver *drv = to_mmc_driver(dev->driver);
 	struct mmc_card *card = mmc_dev_to_card(dev);
-	struct mmc_host *host = card->host;
+	struct mmc_host *host;
 	int ret;
+
+	if (!drv) {
+		pr_debug("%s: %s: drv is NULL\n", dev_name(dev), __func__);
+		return;
+	}
+
+	if (!card) {
+		pr_debug("%s: %s: card is NULL\n", dev_name(dev), __func__);
+		return;
+	}
+
+	host = card->host;
+
+	/* disable rescan in shutdown sequence */
+	host->rescan_disable = 1;
 
 	if (dev->driver && drv->shutdown)
 		drv->shutdown(card);
@@ -156,6 +171,8 @@ static int mmc_bus_suspend(struct device *dev)
 	if (ret)
 		return ret;
 
+	if (mmc_bus_needs_resume(host))
+		return 0;
 	ret = host->bus_ops->suspend(host);
 	if (ret)
 		pm_generic_resume(dev);
@@ -169,11 +186,17 @@ static int mmc_bus_resume(struct device *dev)
 	struct mmc_host *host = card->host;
 	int ret;
 
+	if (mmc_bus_manual_resume(host)) {
+		host->bus_resume_flags |= MMC_BUSRESUME_NEEDS_RESUME;
+		goto skip_full_resume;
+	}
+
 	ret = host->bus_ops->resume(host);
 	if (ret)
 		pr_warn("%s: error %d during resume (card was removed?)\n",
 			mmc_hostname(host), ret);
 
+skip_full_resume:
 	ret = pm_generic_resume(dev);
 	return ret;
 }
@@ -185,6 +208,9 @@ static int mmc_runtime_suspend(struct device *dev)
 	struct mmc_card *card = mmc_dev_to_card(dev);
 	struct mmc_host *host = card->host;
 
+	if (mmc_bus_needs_resume(host))
+		return 0;
+
 	return host->bus_ops->runtime_suspend(host);
 }
 
@@ -192,6 +218,9 @@ static int mmc_runtime_resume(struct device *dev)
 {
 	struct mmc_card *card = mmc_dev_to_card(dev);
 	struct mmc_host *host = card->host;
+
+	if (mmc_bus_needs_resume(host))
+		host->bus_resume_flags &= ~MMC_BUSRESUME_NEEDS_RESUME;
 
 	return host->bus_ops->runtime_resume(host);
 }
@@ -250,12 +279,15 @@ EXPORT_SYMBOL(mmc_unregister_driver);
 static void mmc_release_card(struct device *dev)
 {
 	struct mmc_card *card = mmc_dev_to_card(dev);
+	struct mmc_host *host = card->host;
 
 	sdio_free_common_cis(card);
 
 	kfree(card->info);
 
 	kfree(card);
+	if (host)
+		host->card = NULL;
 }
 
 /*
@@ -346,12 +378,28 @@ int mmc_add_card(struct mmc_card *card)
 			mmc_card_hs400es(card) ? "Enhanced strobe " : "",
 			mmc_card_ddr52(card) ? "DDR " : "",
 			uhs_bus_speed_mode, type, card->rca);
+		ST_LOG("%s: new %s%s%s%s%s%s card at address %04x\n",
+			mmc_hostname(card->host),
+			mmc_card_uhs(card) ? "ultra high speed " :
+			(mmc_card_hs(card) ? "high speed " : ""),
+			mmc_card_hs400(card) ? "HS400 " :
+			(mmc_card_hs200(card) ? "HS200 " : ""),
+			mmc_card_hs400es(card) ? "Enhanced strobe " : "",
+			mmc_card_ddr52(card) ? "DDR " : "",
+			uhs_bus_speed_mode, type, card->rca);
 	}
 
 #ifdef CONFIG_DEBUG_FS
 	mmc_add_card_debugfs(card);
 #endif
 	card->dev.of_node = mmc_of_find_child_device(card->host, 0);
+
+	if (mmc_card_sdio(card)) {
+		ret = device_init_wakeup(&card->dev, true);
+		if (ret)
+			pr_err("%s: %s: failed to init wakeup: %d\n",
+				mmc_hostname(card->host), __func__, ret);
+	}
 
 	device_enable_async_suspend(&card->dev);
 
@@ -362,6 +410,27 @@ int mmc_add_card(struct mmc_card *card)
 	mmc_card_set_present(card);
 
 	return 0;
+}
+
+static void mmc_store_errinfo_into_stlog(struct mmc_card *card)
+{
+	struct mmc_card_error_log *err_log;
+	struct mmc_card_status_err_log *status_err_log;
+	u64 total_c_cnt = 0;
+	u64 total_t_cnt = 0;
+
+	err_log = card->err_log;
+	status_err_log = &card->status_err_log;
+
+	mmc_check_error_count(err_log, &total_c_cnt, &total_t_cnt);
+
+	ST_LOG("%s: \"GE\":\"%d\",\"CC\":\"%d\"," \
+			"\"ECC\":\"%d\",\"WP\":\"%d\",\"OOR\":\"%d\"," \
+			"\"CRC\":\"%lld\",\"TMO\":\"%lld\"\n",
+			mmc_hostname(card->host),
+			status_err_log->ge_cnt, status_err_log->cc_cnt,
+			status_err_log->ecc_cnt, status_err_log->wp_cnt,
+			status_err_log->oor_cnt, total_c_cnt, total_t_cnt);
 }
 
 /*
@@ -388,10 +457,15 @@ void mmc_remove_card(struct mmc_card *card)
 		} else {
 			pr_info("%s: card %04x removed\n",
 				mmc_hostname(card->host), card->rca);
+			ST_LOG("%s: card %04x removed\n",
+				mmc_hostname(card->host), card->rca);
+			mmc_store_errinfo_into_stlog(card);
 		}
 		device_del(&card->dev);
 		of_node_put(card->dev.of_node);
 	}
+	if (host->ops->exit_dbg_mode)
+		host->ops->exit_dbg_mode(host);
 
 	put_device(&card->dev);
 }
