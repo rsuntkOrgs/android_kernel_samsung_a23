@@ -104,18 +104,12 @@ static inline void bss_ref_get(struct cfg80211_registered_device *rdev,
 	lockdep_assert_held(&rdev->bss_lock);
 
 	bss->refcount++;
-	if (bss->pub.hidden_beacon_bss) {
-		bss = container_of(bss->pub.hidden_beacon_bss,
-				   struct cfg80211_internal_bss,
-				   pub);
-		bss->refcount++;
-	}
-	if (bss->pub.transmitted_bss) {
-		bss = container_of(bss->pub.transmitted_bss,
-				   struct cfg80211_internal_bss,
-				   pub);
-		bss->refcount++;
-	}
+
+	if (bss->pub.hidden_beacon_bss)
+		bss_from_pub(bss->pub.hidden_beacon_bss)->refcount++;
+
+	if (bss->pub.transmitted_bss)
+		bss_from_pub(bss->pub.transmitted_bss)->refcount++;
 }
 
 static inline void bss_ref_put(struct cfg80211_registered_device *rdev,
@@ -323,6 +317,15 @@ cfg80211_add_nontrans_list(struct cfg80211_bss *trans_bss,
 		if (is_bss(bss, nontrans_bss->bssid, ssid, ssid_len))
 			return 0;
 	}
+
+	/*
+	 * This is a bit weird - it's not on the list, but already on another
+	 * one! The only way that could happen is if there's some BSSID/SSID
+	 * shared by multiple APs in their multi-BSSID profiles, potentially
+	 * with hidden SSID mixed in ... ignore it.
+	 */
+	if (!list_empty(&nontrans_bss->nontrans_list))
+		return -EINVAL;
 
 	/* add to the list */
 	list_add_tail(&nontrans_bss->nontrans_list, &trans_bss->nontrans_list);
@@ -650,48 +653,43 @@ void cfg80211_bss_expire(struct cfg80211_registered_device *rdev)
 	__cfg80211_bss_expire(rdev, jiffies - IEEE80211_SCAN_RESULT_EXPIRE);
 }
 
-const u8 *cfg80211_find_ie_match(u8 eid, const u8 *ies, int len,
-				 const u8 *match, int match_len,
-				 int match_offset)
+const struct element *
+cfg80211_find_elem_match(u8 eid, const u8 *ies, unsigned int len,
+			 const u8 *match, unsigned int match_len,
+			 unsigned int match_offset)
 {
 	const struct element *elem;
 
-	/* match_offset can't be smaller than 2, unless match_len is
-	 * zero, in which case match_offset must be zero as well.
-	 */
-	if (WARN_ON((match_len && match_offset < 2) ||
-		    (!match_len && match_offset)))
-		return NULL;
-
 	for_each_element_id(elem, eid, ies, len) {
-		if (elem->datalen >= match_offset - 2 + match_len &&
-		    !memcmp(elem->data + match_offset - 2, match, match_len))
-			return (void *)elem;
+		if (elem->datalen >= match_offset + match_len &&
+		    !memcmp(elem->data + match_offset, match, match_len))
+			return elem;
 	}
 
 	return NULL;
 }
-EXPORT_SYMBOL(cfg80211_find_ie_match);
+EXPORT_SYMBOL(cfg80211_find_elem_match);
 
-const u8 *cfg80211_find_vendor_ie(unsigned int oui, int oui_type,
-				  const u8 *ies, int len)
+const struct element *cfg80211_find_vendor_elem(unsigned int oui, int oui_type,
+						const u8 *ies,
+						unsigned int len)
 {
-	const u8 *ie;
+	const struct element *elem;
 	u8 match[] = { oui >> 16, oui >> 8, oui, oui_type };
 	int match_len = (oui_type < 0) ? 3 : sizeof(match);
 
 	if (WARN_ON(oui_type > 0xff))
 		return NULL;
 
-	ie = cfg80211_find_ie_match(WLAN_EID_VENDOR_SPECIFIC, ies, len,
-				    match, match_len, 2);
+	elem = cfg80211_find_elem_match(WLAN_EID_VENDOR_SPECIFIC, ies, len,
+					match, match_len, 0);
 
-	if (ie && (ie[1] < 4))
+	if (!elem || elem->datalen < 4)
 		return NULL;
 
-	return ie;
+	return elem;
 }
-EXPORT_SYMBOL(cfg80211_find_vendor_ie);
+EXPORT_SYMBOL(cfg80211_find_vendor_elem);
 
 /**
  * enum bss_compare_mode - BSS compare mode
@@ -1163,6 +1161,9 @@ cfg80211_bss_update(struct cfg80211_registered_device *rdev,
 		new->refcount = 1;
 		INIT_LIST_HEAD(&new->hidden_list);
 		INIT_LIST_HEAD(&new->pub.nontrans_list);
+		/* we'll set this later if it was non-NULL */
+		new->pub.transmitted_bss = NULL;
+		
 
 		if (rcu_access_pointer(tmp->pub.proberesp_ies)) {
 			hidden = rb_find_bss(rdev, tmp, BSS_CMP_HIDE_ZLEN);
@@ -1258,8 +1259,8 @@ cfg80211_get_bss_channel(struct wiphy *wiphy, const u8 *ie, size_t ielen,
 		return channel;
 	}
 
-	freq = ieee80211_channel_to_frequency(channel_number, channel->band);
-	alt_channel = ieee80211_get_channel(wiphy, freq);
+	freq = ieee80211_channel_to_freq_khz(channel_number, channel->band);
+	alt_channel = ieee80211_get_channel_khz(wiphy, freq);
 	if (!alt_channel) {
 		if (channel->band == NL80211_BAND_2GHZ) {
 			/*
@@ -1387,9 +1388,15 @@ cfg80211_inform_single_bss_data(struct wiphy *wiphy,
 		 */
 		if (cfg80211_add_nontrans_list(non_tx_data->tx_bss,
 					       &res->pub)) {
-			if (__cfg80211_unlink_bss(rdev, res))
+			if (__cfg80211_unlink_bss(rdev, res)) {
 				rdev->bss_generation++;
+				res = NULL;
+			}
 		}
+		spin_unlock_bh(&rdev->bss_lock);
+
+		if (!res)
+			return NULL;		
 	}
 
 	trace_cfg80211_return_bss(&res->pub);
