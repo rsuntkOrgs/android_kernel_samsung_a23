@@ -1,6 +1,10 @@
 # SPDX-License-Identifier: GPL-2.0
 menu "Device Drivers"
 
+config SAMSUNG_PROJECT_A23
+    bool "Samsung Galaxy A23"
+    default y
+
 source "drivers/amba/Kconfig"
 
 source "drivers/base/Kconfig"

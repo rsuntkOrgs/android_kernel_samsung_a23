@@ -18,7 +18,7 @@ ifeq ($(CONFIG_ARCH_SDM660), y)
 include $(srctree)/techpack/audio/config/sdm660auto.conf
 endif
 ifeq ($(CONFIG_ARCH_BENGAL), y)
-ifeq ($(PROJECT_NAME),$(filter $(PROJECT_NAME),a23))
+ifeq ($(CONFIG_SAMSUNG_PROJECT_A23),y)
 include $(srctree)/techpack/audio/config/bengal_a23.conf
 else
 include $(srctree)/techpack/audio/config/bengalauto.conf
@@ -58,7 +58,7 @@ LINUXINCLUDE    += \
                 -include $(srctree)/techpack/audio/config/sdm660autoconf.h
 endif
 ifeq ($(CONFIG_ARCH_BENGAL), y)
-ifeq ($(PROJECT_NAME),$(filter $(PROJECT_NAME),a23))
+ifeq ($(CONFIG_SAMSUNG_PROJECT_A23),y)
 LINUXINCLUDE    += \
                 -include $(srctree)/techpack/audio/config/bengal_a23.h
 else
