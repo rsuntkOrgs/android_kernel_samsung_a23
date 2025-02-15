@@ -66,6 +66,10 @@ LINUXINCLUDE    += \
                 -include $(srctree)/techpack/audio/config/bengalautoconf.h
 endif
 endif
+
+ccflags-y += -Os
+subdir-ccflags-y += -Os
+
 obj-y += soc/
 obj-y += dsp/
 obj-y += ipc/
