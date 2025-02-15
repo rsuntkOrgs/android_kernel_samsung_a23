@@ -196,9 +196,6 @@ obj-$(CONFIG_SENSORS_SSC)	+= sensors/
 obj-$(CONFIG_ADSP_FACTORY)      += adsp_factory/
 obj-y				+= switch/
 
-# FastuH
-obj-$(CONFIG_UH)        += uh/
-
 # SPU signature verify
 obj-$(CONFIG_SPU_VERIFY) += spu_verify/
 
