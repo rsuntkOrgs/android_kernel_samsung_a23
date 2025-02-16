@@ -640,7 +640,7 @@ static struct region_ops rc_region_ops = {
 
 static int rc_sysfs_init(void);
 
-int init_rbincache(unsigned long pfn, unsigned long nr_pages)
+int __init init_rbincache(unsigned long pfn, unsigned long nr_pages)
 {
 	int err = 0;
 
