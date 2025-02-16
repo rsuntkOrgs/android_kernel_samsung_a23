@@ -167,7 +167,7 @@ IMAGE="$(pwd)/out/arch/arm64/boot/Image"
 
 pr_sum() {
 	[ -z $KBUILD_BUILD_USER ] && KBUILD_BUILD_USER="`whoami`"
-	[ -z $KBUILD_BUILD_HOST ] && KBUILD_BUILD_HOST="`hostname`"
+	[ -z $KBUILD_BUILD_HOST ] && KBUILD_BUILD_HOST="`uname -n`"
 	
 	echo ""
 	echo -e "Host Arch: `uname -m`"
