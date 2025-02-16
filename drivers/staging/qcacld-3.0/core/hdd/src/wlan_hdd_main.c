@@ -16703,8 +16703,9 @@ static ssize_t wlan_boot_cb(struct kobject *kobj,
 			    const char *buf,
 			    size_t count)
 {
-
-	if (wlan_loader->loaded_state) {
+	/* Rissu: This is extra */
+	if ((wlan_loader->loaded_state == MODULE_INITIALIZED) ||
+		(wlan_loader->loaded_state >= 1)) {
 		hdd_err("wlan driver already initialized");
 		return -EALREADY;
 	}
