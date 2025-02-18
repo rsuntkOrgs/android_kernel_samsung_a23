@@ -43,7 +43,7 @@ setconfig() { # fmt: setconfig enable/disable <NAME>
 	fi
 }
 clone_ak3() {
-	[ ! -d $(pwd)/AnyKernel3 ] && git clone `echo $DEFAULT_AK3_REPO` --depth=1 AnyKernel3 && rm -rf AnyKernel3/.git
+	[ ! -d $(pwd)/AnyKernel3 ] && git clone `echo $DEFAULT_AK3_REPO` --depth=1 -b general AnyKernel3 && rm -rf AnyKernel3/.git
 }
 gen_getutsrelease() {
 # generate simple c file
@@ -231,7 +231,7 @@ post_build() {
 		fi
 		UTSRELEASE=$(./getutsrel)
 		sed -i "s/kernel\.string=.*/kernel.string=$UTSRELEASE/" "$AK3/anykernel.sh"
-		sed -i "s/BLOCK=.*/BLOCK=\/dev\/block\/by-name\/boot;/" "$AK3/anykernel.sh"
+		#sed -i "s/BLOCK=.*/BLOCK=\/dev\/block\/by-name\/boot;/" "$AK3/anykernel.sh"
 		cp $IMAGE $AK3
 		cd $AK3
 		zip -r9 ../`echo $ZIP_FMT`.zip *
